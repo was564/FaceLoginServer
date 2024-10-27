@@ -1,6 +1,6 @@
 import cv2
 from deepface import DeepFace
-import mariadb
+#import mariadb
 import shutil
 
 
@@ -18,9 +18,10 @@ def verify_face(img_path):
             face = face_obj
 
     if face_count != 1:
+        print(face_count)
         return (False, 'Cant face detection')
-    elif face["is_real"] is False:
-        return (False, 'Face like fake')
+    #elif face["is_real"] is False:
+    #    return (False, 'Face like fake')
     else:
         return (True, 'verify Face')
 
@@ -36,18 +37,22 @@ def find_face(img_path):
     if verified is False:
         return (False, resultText)
 
+
     try:
         result = DeepFace.find(img_path=img,
                                db_path=db_path,
                                detector_backend='mtcnn',
                                model_name='ArcFace')
+        path = result[0]['identity'][0].replace("\\", "/")
+        distance = result[0]['distance'][0]
+
     except ValueError:
         print("얼굴을 찾을 수 없습니다.")
         return (False, 'Cant face process')
     except Exception as e:
         print(e)
         return (False, 'Cant face process')
-
+    '''
     try:
         conn = mariadb.connect(
             user="root",
@@ -63,8 +68,6 @@ def find_face(img_path):
     # Get Cursor
     cur = conn.cursor()
 
-    path = result[0]['identity'][0].replace("\\", "/")
-    distance = result[0]['distance'][0]
     insert_query = f"SELECT name FROM member WHERE img_path='{path}'"
 
     try:
@@ -74,10 +77,13 @@ def find_face(img_path):
         print(f"Error: {e}")
         conn.close()
         return (False, 'No Result')
+    '''
 
     if distance < 0.52:
-        print(query_result)
-        return (True, query_result)
+        #print(query_result)
+        #return (True, query_result)
+        print("good")
+        return (True, "Good")
     else:
         return (False, "No Matching")
 
