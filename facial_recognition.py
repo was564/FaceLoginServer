@@ -1,29 +1,43 @@
 import cv2
 from deepface import DeepFace
+from assembleModel import predict
 #import mariadb
 import shutil
 
 
 def verify_face(img_path):
+    img = cv2.imread(img_path)
+    '''
     try:
-        face_objs = DeepFace.extract_faces(img_path, anti_spoofing=True)
+        face_objs = DeepFace.extract_faces(img_path, detector_backend='opencv')
     except ValueError:
         return (False, 'Cant face detection')
 
-    face_count = 0
-    for face_obj in face_objs:
-        score = face_obj['confidence']
-        if score > 0.90:
-            face_count += 1
-            face = face_obj
-
-    if face_count != 1:
-        print(face_count)
+    if len(face_objs) != 1:
         return (False, 'Cant face detection')
-    #elif face["is_real"] is False:
-    #    return (False, 'Face like fake')
+
+    facial_area = face_objs[0]['facial_area']
+    x, y, w, h = facial_area['x'], facial_area['y'], facial_area['w'], facial_area['h']
+
+    # 패딩 비율만큼 여유 공간을 추가
+    pad_x = int(w * 0.35)
+    pad_y = int(h * 0.35)
+
+    # 확장된 얼굴 영역 계산 (이미지 경계를 넘지 않도록 제한)
+    start_x = max(0, x - pad_x)
+    start_y = max(0, y - pad_y)
+    end_x = min(img.shape[1], x + w + pad_x)
+    end_y = min(img.shape[0], y + h + pad_y)
+
+    # 더 넓게 자른 얼굴 이미지 추출
+    wider_face = img[start_y:end_y, start_x:end_x]
+    '''
+    result = predict(img)
+
+    if result == 'Deepfake':
+        return (False, 'Deepfake')
     else:
-        return (True, 'verify Face')
+        return (True, 'Real')
 
 
 def find_face(img_path):
@@ -33,15 +47,20 @@ def find_face(img_path):
     db_path = './Member'
     path = None
 
+    '''
     verified, resultText = verify_face(img_path)
     if verified is False:
         return (False, resultText)
+    '''
 
+    result = verify_face(img_path)
+    if result[0] is False:
+        return result
 
     try:
         result = DeepFace.find(img_path=img,
                                db_path=db_path,
-                               detector_backend='mtcnn',
+                               detector_backend='opencv',
                                model_name='ArcFace')
         path = result[0]['identity'][0].replace("\\", "/")
         distance = result[0]['distance'][0]
@@ -83,21 +102,22 @@ def find_face(img_path):
         #print(query_result)
         #return (True, query_result)
         print("good")
-        return (True, "Good")
+        return (True, "KimHongJun")
     else:
         return (False, "No Matching")
 
-def register_face(img_path, img_name, name, birthday):
-    img_complete_path = img_path + '/' + img_name
-    img = cv2.imread(img_complete_path)
+def register_face(img_paths, name, birthday):
 
-    verified, resultText = verify_face(img)
-    if verified is False:
-        return (False, resultText)
+    img_file_list = list()
+    for i in range(0, len(img_paths)):
+        img_path = img_paths[i]
+        img = cv2.imread(img_path)
 
-    destination = './Member/' + img_name
-    shutil.copyfile(img_complete_path, destination)
+        destination = './Member/' + name + '_' + birthday + '_' + str(i) + '.jpg'
+        img_file_list.append(destination)
+        shutil.copyfile(img_path, destination)
 
+    '''
     # Connect to MariaDB Platform
     try:
         conn = mariadb.connect(
@@ -125,11 +145,12 @@ def register_face(img_path, img_name, name, birthday):
 
     conn.commit()
     conn.close()
+    '''
     return (True, 'success')
 
 
 if __name__ == '__main__':
-    verified, result = verify_face(f'./Left/test.jpg')
+    verified, result = verify_face(f'./test.jpg')
     print(result)
     #find_face('./Left/Karina2.jpg')
     #register_face('./uploads', 'Karina1.jpg', 'Karina', '2000-01-01')
