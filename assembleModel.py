@@ -1,8 +1,12 @@
 import os
+from threading import Thread
+
 import cv2
 import numpy as np
 import torch
 import pickle
+
+from mpmath.calculus.approximation import fourier
 from transformers import AutoModelForImageClassification, EfficientNetImageProcessor
 
 from sklearn.linear_model import LogisticRegression
@@ -32,6 +36,8 @@ def predict_fourier(image):
     labels = torch.tensor([1])
     model.eval()
     outputs = model(**inputs, labels=labels)
+    global original
+    original = outputs.loss.item()
     return outputs.loss.item()
 
 Amp_model = AutoModelForImageClassification.from_pretrained("./Models_bk/Amplify_Model")
@@ -49,6 +55,8 @@ def predict_amplify(image):
     labels = torch.tensor([1])
     model.eval()
     outputs = model(**inputs, labels=labels)
+    global amplify
+    amplify = outputs.loss.item()
     return outputs.loss.item()
 
 Original_model = AutoModelForImageClassification.from_pretrained("./Models_bk/Original_Model")
@@ -62,19 +70,36 @@ def predict_original(image):
     labels = torch.tensor([1])
     model.eval()
     outputs = model(**inputs, labels=labels)
+    global fourier
+    fourier = outputs.loss.item()
     return outputs.loss.item()
 
+
+
 def get_data(image):
+    t1 = Thread(target=predict_original, args=(image.copy(),))
+    t2 = Thread(target=predict_amplify, args=(image.copy(),))
+    t3 = Thread(target=predict_fourier, args=(image.copy(),))
+    t1.start()
+    t2.start()
+    t3.start()
+    t1.join()
+    t2.join()
+    t3.join()
+    '''
     original = predict_original(image.copy())
     amplify = predict_amplify(image.copy())
     fourier = predict_fourier(image.copy())
+    '''
     return [original, amplify, fourier]
 
 def predict(image_path):
+    # 딥페이크 탐지 모델 결과 추출
     loss_values = get_data(image_path)
     with open('classifier.pkl', 'rb') as f:
         classifier = pickle.load(f)
     f.close()
+    # 기존에 만들어 놓은 분류기 모델 넣기
     result = classifier.predict([loss_values])
     if result == 0:
         return 'Deepfake'

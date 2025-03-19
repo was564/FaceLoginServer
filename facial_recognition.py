@@ -1,6 +1,7 @@
 import cv2
 from deepface import DeepFace
 from assembleModel import predict
+import pymysql
 #import mariadb
 import shutil
 
@@ -71,81 +72,120 @@ def find_face(img_path):
     except Exception as e:
         print(e)
         return (False, 'Cant face process')
-    '''
+
     try:
-        conn = mariadb.connect(
+        conn = pymysql.connect(
             user="root",
-            password="1234",
+            password="4321",
             host="localhost",
             port=3306,
             database="face"
         )
-    except mariadb.Error as e:
+    except pymysql.Error as e:
         print(f"Error connecting to MariaDB Platform: {e}")
         return (False, 'MariaDB cant connect')
 
     # Get Cursor
     cur = conn.cursor()
 
-    insert_query = f"SELECT name FROM member WHERE img_path='{path}'"
+    print(path)
+    insert_query = (f"select name from image_path join member on member.idx = image_path.member_id where path='{path}'");
 
     try:
         cur.execute(insert_query)
         query_result = cur.fetchall()[0][0]
-    except mariadb.Error as e:
+    except Exception as e:
         print(f"Error: {e}")
         conn.close()
+        print("name: " + 'No Result' + ", distance: " + str(distance))
         return (False, 'No Result')
-    '''
 
-    if distance < 0.52:
-        #print(query_result)
-        #return (True, query_result)
-        print("good")
-        return (True, "KimHongJun")
+    print("name: " + query_result + ", distance: " + str(distance))
+    if distance < 0.56:
+        return (True, query_result)
+        #print("good")
+        #return (True, "KimHongJun")
     else:
         return (False, "No Matching")
 
+def check_member(name, birthday):
+    try:
+        conn = pymysql.connect(
+            user="root",
+            password="4321",
+            host="localhost",
+            port=3306,
+            database="face"
+        )
+    except pymysql.Error as e:
+        print(f"Error connecting to MariaDB Platform: {e}")
+        return (False, 'MariaDB cant connect')
+
+        # Get Cursor
+    cur = conn.cursor()
+
+    try:
+        member_id_query = f"SELECT idx FROM member WHERE name = '{name}' AND birth = '{birthday}'"
+        cur.execute(member_id_query)
+        haveMember =  True if len(cur.fetchall()) == 1 else False
+    except pymysql.Error as e:
+        print(f"Error: {e}")
+        conn.close()
+        return (False, 'error')
+
+    conn.commit()
+    conn.close()
+
+    if haveMember:
+        return (False, 'already entry')
+    else:
+        return (True, 'member empty')
+
 def register_face(img_paths, name, birthday):
 
-    img_file_list = list()
-    for i in range(0, len(img_paths)):
-        img_path = img_paths[i]
-        img = cv2.imread(img_path)
 
-        destination = './Member/' + name + '_' + birthday + '_' + str(i) + '.jpg'
-        img_file_list.append(destination)
-        shutil.copyfile(img_path, destination)
-
-    '''
     # Connect to MariaDB Platform
     try:
-        conn = mariadb.connect(
-            user="xxxx",
-            password="xxxx",
+        conn = pymysql.connect(
+            user="root",
+            password="4321",
             host="localhost",
-            port=0000,
-            database="res"
+            port=3306,
+            database="face"
         )
-    except mariadb.Error as e:
+    except pymysql.Error as e:
         print(f"Error connecting to MariaDB Platform: {e}")
         return (False, 'MariaDB cant connect')
 
     # Get Cursor
     cur = conn.cursor()
 
-    insert_query = "INSERT INTO member (name, birth, img_path) VALUES (?, ?, ?)"
-
     try:
-        cur.execute(insert_query, (name, birthday, destination))
-    except mariadb.Error as e:
+        insert_member_query = f"INSERT INTO member (name, birth) VALUES ('{name}', '{birthday}')"
+        cur.execute(insert_member_query)
+        member_id_query = f"SELECT idx FROM member WHERE name = '{name}' AND birth = '{birthday}'"
+        cur.execute(member_id_query)
+        member_id = cur.fetchall()[0][0]
+
+        img_file_list = list()
+        for i in range(0, len(img_paths)):
+            img_path = img_paths[i]
+
+            destination = './Member/' + str(member_id) + '_' + birthday + '_' + str(i) + '.jpg'
+            img_file_list.append(destination)
+            shutil.copyfile(img_path, destination)
+
+        for path in img_file_list:
+            insert_image_path_query = f"INSERT INTO image_path (member_id, path) VALUES ('{member_id}', '{path}')"
+            cur.execute(insert_image_path_query)
+    except pymysql.Error as e:
         print(f"Error: {e}")
         conn.close()
         return (False, 'already entry')
 
     conn.commit()
     conn.close()
-    '''
+
     return (True, 'success')
 
 

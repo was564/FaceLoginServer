@@ -1,6 +1,6 @@
 import os
 from flask import Flask, flash, request
-from facial_recognition import find_face, register_face
+from facial_recognition import find_face, register_face, check_member
 
 from werkzeug.utils import secure_filename
 
@@ -62,7 +62,7 @@ def check_face():
         if name_count[name] > max_tuple[0]:
             max_tuple = (name_count[name], name)
 
-    if max_tuple[0] < 3 | error_count[0] > 2:
+    if max_tuple[0] < int(len(result_list) * 0.5 + 1) | error_count[0] > int(len(result_list) * 0.5):
         response_post_file["status"] = 400
         response_post_file["try"] = max_tuple[0]
         response_post_file["name"] = max_tuple[1]
@@ -74,6 +74,28 @@ def check_face():
         os.remove(path)
 
     print(response_post_file)
+    return response_post_file
+
+@app.route('/face/delete_member', methods=['POST'])
+def delete_member():
+    init_post_file()
+    name = request.form['name'].replace('"', "")
+    birth = request.form['birth'].replace('"', "")
+
+
+@app.route('/face/check_member', methods=['POST'])
+def check_member_rq():
+    init_post_file()
+    name = request.form['name'].replace('"', "")
+    birth = request.form['birth'].replace('"', "")
+
+    result, result_value = check_member(name, birth)
+    if result:
+        response_post_file["status"] = 200
+    else:
+        response_post_file["status"] = 400
+        response_post_file["name"] = result_value
+
     return response_post_file
 
 
@@ -92,7 +114,9 @@ def register_member():
         return 'No Info'
 
     saved_file_list = []
-    for file in image_file_list:
+    for i in range(0, len(image_file_list)):
+        file = image_file_list[i]
+        file.filename = name + '_' + birth + '_' + str(i) + ".jpg"
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
@@ -114,4 +138,4 @@ def register_member():
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', port=5000)
